@@ -1,3 +1,4 @@
+
 import socket
 import ssl
 import sys
@@ -7,31 +8,39 @@ if len(sys.argv) < 2:
     sys.exit(1)
 website = sys.argv[1]
 
-# list of ciphers
-ciphers = ['TLS_AES_128_GCM_SHA256',
-           'TLS_AES_256_GCM_SHA384',
-           'TLS_CHACHA20_POLY1305_SHA256',
+print(f"\nCipher Scanning initiated for {website}\n")
+
+# list of ciphers 1.2
+ciphers = [
            'ECDHE-RSA-AES128-GCM-SHA256', 
            'ECDHE-ECDSA-CHACHA20-POLY1305',
-           'TLS_RSA_WITH_AES_128_CBC_SHA']
+           'DES-CBC3-SHA']
 
 # context
 context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-context.load_default_certs()    
+context.load_default_certs()  
+context.maximum_version = ssl.TLSVersion.TLSv1_2
+
 
 for cipher in ciphers:
-    
+    client_socket = None
     try:
-        context.set_ciphers(cipher)
-        # tcp connection (AF_INET -> IPV4 and SOCK_STREAM -> TCP)
+        context.maximum_version = ssl.TLSVersion.TLSv1_2
+        context.set_ciphers(f'{cipher}:@SECLEVEL=0')  
         client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         client_socket.connect((website, 443)) 
 
         tls_socket = context.wrap_socket(client_socket, server_hostname=website)
 
         print(cipher + ": TLS connection established!")
-    except Exception as e:
-        print(cipher + ": Not able to connect")
-
-
+    except ssl.SSLError as e:
+        print(f"{cipher}: Rejected by server ({e})")
+    except OSError as e:
+        print(f"{cipher}: Connection error ({e})")
+    finally:
+        if client_socket:
+            try:
+                client_socket.close()
+            except OSError:
+                    pass
 
